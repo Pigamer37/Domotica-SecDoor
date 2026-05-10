@@ -1,6 +1,8 @@
-import time, argparse, socket, json, re
+import time, argparse, socket, json, re, threading
 
 import paho.mqtt.client as mqtt
+
+threadStop = threading.Event()
 
 
 def printError(message):
@@ -20,6 +22,10 @@ class DoorLogic:
             (host, port), family=socket.AF_INET, backlog=5
         )
 
+        self.sockThread = threading.Thread(
+            target=self.socket_listener, name="SocketListenerThread"
+        )
+
         self.client = mqtt.Client(
             mqtt.CallbackAPIVersion.VERSION2, transport="websockets"
         )
@@ -32,16 +38,30 @@ class DoorLogic:
         self.client.connect(broker_address, mqttPort, keep_alive_interval)
 
     def socket_listener(self):
-        conn, addr = self.mySocket.accept()
-        data = conn.recv(1024).decode().strip()
-        printInfo(f"Received (TCP socket): '{data}'")
-        if data != self.password:
-            self.alert("Unauthorized socket read attempt detected.")
-            conn.send("Unauthorized".encode())
-        else:
-            conn.send(self.encode_json_sensor_data().encode())
+        while not threadStop.is_set():
+            try:
+                conn, addr = self.mySocket.accept()
+                data = conn.recv(1024).decode().strip()
+                printInfo(f"Received (TCP socket): '{data}'")
+                if data != self.password:
+                    self.alert("Unauthorized socket read attempt detected.")
+                    conn.send("Unauthorized".encode())
+                else:
+                    conn.send(self.encode_json_sensor_data().encode())
 
-        conn.close()
+                conn.close()
+            except socket.error as e:
+                if threadStop.is_set():
+                    printInfo("Socket listener stopping due to stop signal.")
+                else:
+                    printError(f"Socket error: {e}")
+                return  # Exit the listener on socket errors
+            except Exception as e:
+                printError(f"Socket accept interrupted: {e}")
+                return  # Exit if the socket is closed
+
+        printInfo("Closing TCP server socket...")
+        self.mySocket.close()  # close the socket when stopping the listener
 
     def encode_json_sensor_data(self):
         # Simulate sensor data
@@ -126,13 +146,18 @@ class DoorLogic:
     def start(self):
         printInfo("Starting MQTT client loop")
         self.client.loop_start()  # starts thread to process network traffic and dispatch callbacks
+        printInfo("Starting TCP server thread")
+        self.sockThread.start()
 
     def stop(self):
         print("--- Door Logic ---")
         printInfo("Stopping MQTT client")
         self.client.loop_stop()  # stops the network thread and disconnects from the broker
         printInfo("Stopping TCP server")
+        threadStop.set()  # signal the thread to stop
+        self.mySocket.shutdown(socket.SHUT_RDWR)  # unblock the accept() call
         self.mySocket.close()  # close the TCP socket
+        self.sockThread.join()
 
     def disconnect(self):
         self.client.disconnect()  # disconnects from the broker
@@ -147,7 +172,8 @@ def main(args):
     try:
         dl.start()
         while True:
-            dl.socket_listener()
+            pass  # GPIO code
+            # dl.socket_listener()
             # time.sleep(1.5)
             # print("Hola")
     except KeyboardInterrupt:
