@@ -1,1 +1,5 @@
 paho-mqtt
+i2c-tools
+smbus
+# May need --break-system-packages
+RPLCD

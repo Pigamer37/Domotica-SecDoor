@@ -2,6 +2,8 @@ import time, argparse, socket, json, re, threading
 
 import paho.mqtt.client as mqtt
 
+import Puertaseguridad
+
 threadStop = threading.Event()
 
 
@@ -121,6 +123,7 @@ class DoorLogic:
             return
 
         self.password = new
+        Puertaseguridad.cambiar_contraseña(new)
         printInfo("Password successfully reset.")
 
     def _parse_password_payload(self, payload):
@@ -170,12 +173,95 @@ def main(args):
     dl = DoorLogic(args.broker, args.mqtt_port, args.keep_alive, args.host, args.port)
 
     try:
+        Puertaseguridad.setup()
+        Puertaseguridad.cambiar_contraseña(dl.password)
         dl.start()
         while True:
-            pass  # GPIO code
-            # dl.socket_listener()
-            # time.sleep(1.5)
-            # print("Hola")
+            dist = Puertaseguridad.medir_distancia()
+            if 0 < dist < 50:  # Si hay alguien a menos de 50cm
+                if not cliente_detectado:
+                    print(f"🚨 ALERTA: Sujeto a {int(dist)}cm")
+                    cliente_detectado = True
+            else:
+                if cliente_detectado:
+                    print("✅ Zona despejada.")
+                    cliente_detectado = False
+
+            # 2. GESTIÓN DEL TECLADO
+            tecla = Puertaseguridad.leer_teclado()
+            if tecla:
+                if tecla == "D":
+                    Puertaseguridad.codigo_actual = Puertaseguridad.codigo_actual[:-1]
+                    Puertaseguridad.actualizar_pantalla(
+                        "PIN:", "*" * len(Puertaseguridad.codigo_actual)
+                    )
+                elif tecla == "#":
+                    if Puertaseguridad.codigo_actual == dl.password:
+                        # SECUENCIA JOYSTICK
+                        paso = 0
+                        t_inicio = time.time()
+                        logrado = False
+                        while (time.time() - t_inicio) < 15:
+                            Puertaseguridad.actualizar_pantalla(
+                                f"TIEMPO: {int(15-(time.time()-t_inicio))}s",
+                                "SEQ: " + "*" * paso,
+                            )
+                            accion = Puertaseguridad.leer_joystick()
+                            if accion != "CENTRO":
+                                if accion == Puertaseguridad.SECUENCIA_SECRETA[paso]:
+                                    paso += 1
+                                    Puertaseguridad.beep(0.1)
+                                    if paso == len(Puertaseguridad.SECUENCIA_SECRETA):
+                                        logrado = True
+                                        break
+                                else:
+                                    paso = 0
+                                    Puertaseguridad.beep(0.5)
+                                    time.sleep(0.5)
+                                while Puertaseguridad.leer_joystick() != "CENTRO":
+                                    time.sleep(0.1)
+                            time.sleep(0.05)
+
+                        if logrado:
+                            Puertaseguridad.actualizar_pantalla(
+                                "ACCESO OK", "ABRIENDO..."
+                            )
+                            Puertaseguridad.LED_verde()
+                            Puertaseguridad.mover_servo(90)
+                            for i in range(120, -1, -1):
+                                Puertaseguridad.actualizar_pantalla(
+                                    "PUERTA ABIERTA", f"CIERRE: {i//60:02d}:{i%60:02d}"
+                                )
+                                time.sleep(1)
+                            Puertaseguridad.mover_servo(0)
+                            Puertaseguridad.LED_rojo()
+                        else:
+                            Puertaseguridad.actualizar_pantalla("ERROR", "BLOQUEADO")
+                            time.sleep(2)
+                        Puertaseguridad.codigo_actual = ""
+                        Puertaseguridad.actualizar_pantalla(
+                            "BANCO CENTRAL", "INTRODUZCA PIN"
+                        )
+                    else:
+                        Puertaseguridad.actualizar_pantalla("PIN ERRONEO", "REINTENTE")
+                        Puertaseguridad.beep(0.6)
+                        Puertaseguridad.codigo_actual = ""
+                        time.sleep(2)
+                        Puertaseguridad.actualizar_pantalla(
+                            "BANCO CENTRAL", "INTRODUZCA PIN"
+                        )
+                elif len(Puertaseguridad.codigo_actual) < 4 and tecla not in [
+                    "A",
+                    "B",
+                    "C",
+                    "*",
+                ]:
+                    Puertaseguridad.codigo_actual += tecla
+                    Puertaseguridad.actualizar_pantalla(
+                        "PIN:", "*" * len(Puertaseguridad.codigo_actual)
+                    )
+
+            time.sleep(0.05)
     except KeyboardInterrupt:
         print("\nCtrl+C detected. Stopping the door logic...")
         dl.stop()
