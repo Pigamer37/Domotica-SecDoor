@@ -163,6 +163,17 @@ def LED_rojo():
     GPIO.output(LED_ROJO, GPIO.HIGH)
 
 
+def abrir_puerta():
+    actualizar_pantalla("ACCESO OK", "ABRIENDO...")
+    LED_verde()
+    mover_servo(90)
+    for i in range(120, -1, -1):
+        actualizar_pantalla("PUERTA ABIERTA", f"CIERRE: {i//60:02d}:{i%60:02d}")
+        time.sleep(1)
+    mover_servo(0)
+    LED_rojo()
+
+
 # --- 3. BUCLE PRINCIPAL ---
 def main_bucle():
     global cliente_detectado, codigo_actual
@@ -211,16 +222,7 @@ def main_bucle():
                     time.sleep(0.05)
 
                 if logrado:
-                    actualizar_pantalla("ACCESO OK", "ABRIENDO...")
-                    LED_verde()
-                    mover_servo(90)
-                    for i in range(120, -1, -1):
-                        actualizar_pantalla(
-                            "PUERTA ABIERTA", f"CIERRE: {i//60:02d}:{i%60:02d}"
-                        )
-                        time.sleep(1)
-                    mover_servo(0)
-                    LED_rojo()
+                    abrir_puerta()
                 else:
                     actualizar_pantalla("ERROR", "BLOQUEADO")
                     time.sleep(2)

@@ -103,7 +103,7 @@ class DoorLogic:
                 if decoded_payload.strip() != self.password:
                     self.alert("Unauthorized unlock attempt detected.")
                 else:
-                    printInfo("Unlocking the door...")
+                    Puertaseguridad.abrir_puerta()
             case "etsii/securityDoor/resetPassword":
                 self.reset_password(decoded_payload)
             case "etsii/securityDoor/alert":
@@ -123,7 +123,6 @@ class DoorLogic:
             return
 
         self.password = new
-        Puertaseguridad.cambiar_contraseña(new)
         printInfo("Password successfully reset.")
 
     def _parse_password_payload(self, payload):
@@ -174,17 +173,18 @@ def main(args):
 
     try:
         Puertaseguridad.setup()
-        Puertaseguridad.cambiar_contraseña(dl.password)
         dl.start()
         while True:
             dist = Puertaseguridad.medir_distancia()
             if 0 < dist < 50:  # Si hay alguien a menos de 50cm
                 if not cliente_detectado:
                     print(f"🚨 ALERTA: Sujeto a {int(dist)}cm")
+                    dl.alert(f"Subject detected at {int(dist)}cm")
                     cliente_detectado = True
             else:
                 if cliente_detectado:
                     print("✅ Zona despejada.")
+                    dl.alert(f"Subject left, zone clear")
                     cliente_detectado = False
 
             # 2. GESTIÓN DEL TECLADO
@@ -223,20 +223,12 @@ def main(args):
                             time.sleep(0.05)
 
                         if logrado:
-                            Puertaseguridad.actualizar_pantalla(
-                                "ACCESO OK", "ABRIENDO..."
-                            )
-                            Puertaseguridad.LED_verde()
-                            Puertaseguridad.mover_servo(90)
-                            for i in range(120, -1, -1):
-                                Puertaseguridad.actualizar_pantalla(
-                                    "PUERTA ABIERTA", f"CIERRE: {i//60:02d}:{i%60:02d}"
-                                )
-                                time.sleep(1)
-                            Puertaseguridad.mover_servo(0)
-                            Puertaseguridad.LED_rojo()
+                            Puertaseguridad.abrir_puerta()
                         else:
                             Puertaseguridad.actualizar_pantalla("ERROR", "BLOQUEADO")
+                            dl.alert(
+                                "Unauthorized access attempt detected via joystick."
+                            )
                             time.sleep(2)
                         Puertaseguridad.codigo_actual = ""
                         Puertaseguridad.actualizar_pantalla(
@@ -244,6 +236,7 @@ def main(args):
                         )
                     else:
                         Puertaseguridad.actualizar_pantalla("PIN ERRONEO", "REINTENTE")
+                        dl.alert("Unauthorized access attempt detected via keypad.")
                         Puertaseguridad.beep(0.6)
                         Puertaseguridad.codigo_actual = ""
                         time.sleep(2)
