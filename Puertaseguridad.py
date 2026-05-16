@@ -68,7 +68,7 @@ def setup():
     pwm = GPIO.PWM(SERVO_PIN, 50)
     pwm.start(0)
 
-    mover_servo(0)
+    mover_servo(180)
     GPIO.output(LED_ROJO, GPIO.HIGH)
     actualizar_pantalla("SISTEMA ACTIVO", "INTRODUZCA PIN")
     print("--- Bóveda Iniciada (Monitorizando con Ultrasonido) ---")
@@ -164,13 +164,15 @@ def LED_rojo():
 
 
 def abrir_puerta():
+    print("ABRIENDO PUERTA...")
     actualizar_pantalla("ACCESO OK", "ABRIENDO...")
     LED_verde()
-    mover_servo(90)
+    mover_servo(0)
     for i in range(120, -1, -1):
         actualizar_pantalla("PUERTA ABIERTA", f"CIERRE: {i//60:02d}:{i%60:02d}")
         time.sleep(1)
-    mover_servo(0)
+    print("CERRANDO PUERTA...")
+    mover_servo(180)
     LED_rojo()
 
 
