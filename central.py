@@ -67,7 +67,13 @@ class DoorLogic:
 
     def encode_json_sensor_data(self):
         # Simulate sensor data
-        sensor_data = {"temperature": 22.5, "humidity": 60, "door_status": "closed"}
+        #sensor_data = {"temperature": 22.5, "humidity": 60, "door_status": "closed"}
+        dist = Puertaseguridad.medir_distancia()
+        if 0 < dist < 25:
+            presence = True
+        else:
+            presence = False
+        sensor_data = {"broker": self.client.host, "port": self.client.port, "presence": presence}
         return json.dumps(sensor_data)
 
     def on_connect(self, client, userdata, flags, reason_code, properties):
@@ -177,7 +183,7 @@ def main(args):
         cliente_detectado = False
         while True:
             dist = Puertaseguridad.medir_distancia()
-            if 0 < dist < 50:  # Si hay alguien a menos de 50cm
+            if 0 < dist < 25:  # Si hay alguien a menos de 50cm
                 if not cliente_detectado:
                     print(f" ALERTA: Sujeto a {int(dist)}cm")
                     dl.alert(f"Subject detected at {int(dist)}cm")
@@ -305,3 +311,4 @@ if __name__ == "__main__":
 
     parsed_args = parser.parse_args()
     main(parsed_args)
+
