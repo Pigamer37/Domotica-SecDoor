@@ -241,11 +241,12 @@ def main_bucle():
     time.sleep(0.05)
 
 
-try:
-    setup()
-    while True:
-        main_bucle()
+if __name__ == "__main__":
+    try:
+        setup()
+        while True:
+            main_bucle()
 
-except KeyboardInterrupt:
-    pwm.stop()
-    GPIO.cleanup()
+    except KeyboardInterrupt:
+        pwm.stop()
+        GPIO.cleanup()

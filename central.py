@@ -174,16 +174,17 @@ def main(args):
     try:
         Puertaseguridad.setup()
         dl.start()
+        cliente_detectado = False
         while True:
             dist = Puertaseguridad.medir_distancia()
             if 0 < dist < 50:  # Si hay alguien a menos de 50cm
                 if not cliente_detectado:
-                    print(f"🚨 ALERTA: Sujeto a {int(dist)}cm")
+                    print(f" ALERTA: Sujeto a {int(dist)}cm")
                     dl.alert(f"Subject detected at {int(dist)}cm")
                     cliente_detectado = True
             else:
                 if cliente_detectado:
-                    print("✅ Zona despejada.")
+                    print(" Zona despejada.")
                     dl.alert(f"Subject left, zone clear")
                     cliente_detectado = False
 
